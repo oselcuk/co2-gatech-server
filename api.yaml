@@ -1,0 +1,405 @@
+openapi: 3.0.0
+info:
+  description: API to retrieve information about CO2 emissions at Tech
+  version: "1"
+  title: CO2@GaTech API
+  contact:
+    email: oselcuk@gatech.edu
+tags:
+  - name: authorized
+    description: Requires GaTech authorization
+  - name: public
+    description: Available to everyone
+paths:
+  /departments:
+    get:
+      tags:
+        - public
+      summary: List departments and their CO2 debt overview
+      operationId: api.list_departments
+      description: |
+        Get list of departments. In addition to listing their names and URLs,
+        this gives an overview of the total CO2 debt of the department
+      parameters:
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/fields'
+        - $ref: '#/components/parameters/sortBy'
+        - $ref: '#/components/parameters/sortOrder'
+        - $ref: '#/components/parameters/units'
+        - in: query
+          name: begin
+          description: |
+            Emissions due to itineraries that began before this date will be ignored for the summary.
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end
+          description: |
+            Emissions due to itineraries that began after this date will be ignored for the summary.
+          schema:
+            type: string
+            format: date
+
+      responses:
+        '200':
+          description: |
+            Returns a list of departments, no more than `offset` if provided, 10 if not
+            Note that the `count` field denotes the total number of departments, not just
+            the ones that were returned. If
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/listOfDepartments'
+              example:
+                count: 1
+                result:
+                  - code: COC
+                    name: College of Computing
+                    totalEmissions: 1500
+                    percentOfTotal: 55.5
+                    costToOffset: 6000
+                    alreadyOffset: 500
+        '400':
+          description: bad input parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorReturn'
+    post:
+      tags:
+        - authorized
+      summary: adds a department
+      operationId: api.add_department
+      description: Adds a department to the institute
+      parameters:
+        - in: query
+          name: department
+          description: department to add
+          schema:
+            $ref: "#/components/schemas/DepartmentSummary"
+          style: form
+          explode: true
+      responses:
+        '201':
+          description: item created
+        '400':
+          description: invalid input
+        '409':
+          description: department with same id already exists
+  /departments/{department}:
+    get:
+      tags:
+        - public
+      summary: get details for a department
+      operationId: api.get_department
+      parameters:
+        - name: department
+          in: path
+          description: department code
+          required: true
+          schema:
+            type: string
+            example: EAS
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/fields'
+        - $ref: '#/components/parameters/units'
+        - name: period
+          in: query
+          description: |
+            time period to return information for, specified with `start=YYYYMMDD`(inclusive)
+            and optionally `end=YYYYMMDD`(exclusive). Alternatively, `year=YYYY` can be used to
+            mean the school year starting on the fall of that year, and `season=Fall|Spring|Summer`
+            can be provided to specify only that semester of the year. Defaults to all time
+          required: false
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/timePeriod'
+              - $ref: '#/components/schemas/semester'
+          style: form
+          explode: true
+        - name: granularity
+          in: query
+          description: |
+            how granular the data should be. By default, entire time period is returned in a single row
+          required: false
+          schema:
+            type: string
+            enum: [week, month, semester, year, schoolYear]
+      responses:
+        '200':
+          description: One or more rows of emission data, covering the requested interval
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/EmissionData'
+        '400':
+          description: bad input parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorReturn'
+        '404':
+          description: Department not found
+servers:
+  - url: '/api'
+components:
+  schemas:
+    DepartmentSummary:
+      type: object
+      required:
+        - code
+        - name
+      properties:
+        code:
+          type: string
+          description: |
+            Short name of the department, which has no spaces or punctuation.
+            Used after /department/ to locate the department
+          example: EAS
+        name:
+          type: string
+          description: |
+            Full name of department, can include any unicode character
+          example: School of Earth and Atmospheric Sciences
+        totalEmissions:
+          type: integer
+          default: 0
+          minimum: 0
+          description: |
+            Total emissions caused by this department. Unit is tonnes of CO2
+        percentOfTotal:
+          type: number
+          default: 0
+          minimum: 0
+          maximum: 100
+          description: |
+            Percentage of total emissions of the institute that this department
+            is responsible for
+        costToOffset:
+          type: integer
+          default: 0
+          minimum: 0
+          description: |
+            Estimated USD amount required to offset all emissions
+        alreadyOffset:
+          type: integer
+          default: 0
+          minimum: 0
+          description: |
+            Amount of CO2 already offset by some means, e.g. via donations
+            Can be larger than totalEmissions if the department was proactive
+      example:
+        code: COC
+        name: College of Computing
+        totalEmissions: 1500
+        percentOfTotal: 55.5
+        costToOffset: 6000
+        alreadyOffset: 500
+    EmissionData:
+      type: object
+      required:
+        - totalEmissions
+        - costToOffset
+      properties:
+        period:
+          oneOf:
+            - $ref: '#/components/schemas/timePeriod'
+            - $ref: '#/components/schemas/semester'
+          description: |
+            Time period for the row. If present, `start` is inclusive and `end` is exclusive
+        totalEmissions:
+          type: integer
+          default: 0
+          minimum: 0
+          description: |
+            Total emissions caused by this department. Unit is tonnes of CO2
+        costToOffset:
+          type: integer
+          default: 0
+          minimum: 0
+          description: |
+            Estimated USD amount required to offset all emissions
+        alreadyOffset:
+          type: integer
+          default: 0
+          minimum: 0
+          description: |
+            Amount of CO2 already offset by some means, e.g. via donations
+            Can be larger than totalEmissions if the department was proactive
+        emissionsByHaul:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              emissions:
+                type: number
+                minimum: 0
+              percentage:
+                type: number
+                minimum: 0
+                maximum: 100
+          description: |
+            Maps haul types to total emissions and percentage they're responsible for
+            Current haul types are 'short', 'medium' and 'long'
+        equivalents:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              equivalent:
+                type: number
+                minimum: 0
+              pretty:
+                type: string
+          description: |
+            Maps equivalency types to the equivalent of the emissions of this row in the
+            equivalency units, as well as a pretty string ready for display. Currently the
+            only equivalency type is 'car-years'.
+      example:
+        period:
+          year: 2019
+          season: Spring
+        totalEmissions: 1234.5
+        emissionsByHaul:
+          short:
+            totalEmissions: 1200
+            percentage: 97.205
+          medium:
+            totalEmissions: 34.5
+            percentage: 2.795
+          long:
+            totalEmissions: 0
+            percentage: 0
+        equivalents:
+          car-years:
+            equivalent: 30.5
+            pretty: Equivalent to putting 30.5 cars on the road for a year
+
+    listOfDepartments:
+      type: object
+      required:
+        - result
+        - count
+      properties:
+        result:
+          type: array
+          items:
+            $ref: '#/components/schemas/DepartmentSummary'
+        count:
+          type: integer
+          format: int32
+          minimum: 0
+    errorReturn:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+      example:
+        error: Invalid field name provided in `fields` parameter
+    timePeriod:
+      type: object
+      required:
+        - begin
+      description: |
+        Denotes a time period, with a start and optionally an end
+        If end isn't provided, it is assumed to be in the far future
+      properties:
+        begin:
+          type: string
+          description: of format `YYYYMMDD`
+          example: 20190101
+        end:
+          type: string
+          description: of format `YYYYMMDD`
+          example: 20190130
+    semester:
+      type: object
+      required:
+        - year
+      properties:
+        year:
+          type: integer
+          minimum: 1970
+          maximum: 2030 # when the universe will end, according to unix timestamps
+          description: |
+            Describes a school year. If season is left out, describes the school
+            year starting with the Fall of the given year. So for 2019, it would
+            be the 2019-2020 school year consisting of Fall 2019, Spring 2020, Summer 2020
+          example: 2019
+        season:
+          type: string
+          enum: [Fall, Spring, Summer]
+          description: season for semester
+          example: Fall
+      example:
+        year: 2019
+        season: Fall
+
+
+  parameters:
+    offset:
+      in: query
+      name: offset
+      description: offset for pagination
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 0
+        default: 0
+    limit:
+      in: query
+      name: limit
+      description: maximum number of records to return
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+        maximum: 100
+        default: 10
+    fields:
+      in: query
+      name: fields
+      description: fields to return
+      required: false
+      schema:
+        type: array
+        items:
+          type: string
+        default: []
+      style: form
+      explode: false
+      example: ['code']
+    sortBy:
+      in: query
+      name: sortBy
+      description: name of the field to sort by
+      required: false
+      schema:
+        type: string
+      example: totalEmissions
+    sortOrder:
+      in: query
+      name: sortOrder
+      description: direction to sort, has no effect without `sortBy`
+      required: false
+      schema:
+        type: string
+        enum: [asc, desc]
+        default: desc
+    units:
+      in: query
+      name: units
+      description: units to return data in
+      required: false
+      schema:
+        type: string
+        enum: [metric, imperial]
+        default: metric
