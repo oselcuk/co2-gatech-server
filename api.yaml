@@ -145,6 +145,80 @@ paths:
                 $ref: '#/components/schemas/errorReturn'
         '404':
           description: Department not found
+  /top_emitters:
+    get:
+      tags:
+        - public
+      summary: get top emitting anonymized individuals
+      operationId: api.get_top_emitters
+      parameters:
+        - $ref: '#/components/parameters/offset'
+        - $ref: '#/components/parameters/limit'
+        - $ref: '#/components/parameters/units'
+        - in: query
+          name: begin
+          description: |
+            Emissions due to itineraries that began before this date will be ignored for the summary.
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: end
+          description: |
+            Emissions due to itineraries that began after this date will be ignored for the summary.
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: One or more rows of individuals and their emission details, in the requested units
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  result:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        rank:
+                          type: integer
+                          description: |
+                            "Rank" of the individual, with the top polluter for
+                            the given time interval being ranked 1. First
+                            individual's rank is guaranteed to be equal to the
+                            given offset + 1, with the following individuals
+                            increasing by one
+                        totalEmissions:
+                          type: number
+                          description: |
+                            Total amount of emissions caused by this individual
+                            in the given timeframe, in given units (kg if
+                            metric, lb if imperial)
+                        totalDistance:
+                          type: number
+                          description: |
+                            Total distance traveled by flight by this
+                            individual in the given timeframe, in given units
+                            (km if metric, mi if imperial)
+                        numberOfFlights:
+                          type: integer
+                          description: |
+                            Number of flights for this individual in the given
+                            timeframe.
+                  total:
+                    type: integer
+                    description: |
+                      Total number of individuals. Use this to help with
+                      pagination
+        '400':
+          description: bad input parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/errorReturn'
+
 servers:
   - url: '/api'
 components:

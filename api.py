@@ -5,6 +5,9 @@ from google.cloud import firestore
 
 db = firestore.Client.from_service_account_json('co2-gatech-service-key.json')
 
+KG_TO_LB = 2.20462
+KM_TO_MI = 0.621371
+
 
 def parse_date(date):
     return datetime.strptime(date, '%Y-%m-%d') if date else None
@@ -42,14 +45,51 @@ def list_departments(offset, limit, fields, units, begin=None, end=None):
     if units == 'imperial':
         for dep in deps:
             # kg to lb
-            dep[kTotalEmissions] *= 2.20462
+            dep[kTotalEmissions] *= KG_TO_LB
             # km to mi
-            dep[kTotalDistance] *= 0.621371
-    return {
-        'result': deps,
-        'total': 1,
-        'timePeriod': '{}:{}'.format(begin, end)
-    }
+            dep[kTotalDistance] *= KM_TO_MI
+    return {'result': deps, 'total': 1}
+
+
+def get_top_emitters(offset, limit, units, begin=None, end=None):
+    flights_ref = db.collection('flights')
+    if begin or end:
+        begin = parse_date(begin) or datetime.min
+        end = parse_date(end) or datetime.max
+        flights_ref.where('departure_date', '>=',
+                          begin).where('departure_date', '<=', end)
+    emitters = {}
+    for flight in flights_ref.get():
+        d = flight.to_dict()
+        passenger = d['passenger']
+        if passenger not in emitters:
+            emitters[passenger] = [0, 0, 0]
+        # emission, distance, #flights
+        data = emitters[passenger]
+        data[0] += d['emission']
+        data[1] += d['distance']
+        data[2] += 1
+
+    emitters = list(emitters.values())
+    total = len(emitters)
+    emitters.sort(reverse=True)
+    emitters = emitters[offset:(limit + offset)]
+    if units == 'imperial':
+        for emitter in emitters:
+            emitter[0] *= KG_TO_LB
+            emitter[1] *= KM_TO_MI
+
+    def idx_and_data_to_row(e):
+        i, d = e
+        return {
+            'rank': offset + 1 + i,
+            'totalEmissions': d[0],
+            'totalDistance': d[1],
+            'numberOfFlights': d[2]
+        }
+
+    emitters = map(idx_and_data_to_row, enumerate(emitters))
+    return {'result': list(emitters), 'total': total}
 
 
 def add_department(idd, name):
