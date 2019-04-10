@@ -125,9 +125,10 @@ def get_department(
         for clas in ('economy', 'economy+', 'business', 'first')
     }
     total = 0
+    factor = KG_TO_LB if units == 'imperial' else 1
     for flight in flights_ref.get():
         d = flight.to_dict()
-        emission = d['emission']
+        emission = d['emission'] * factor
         total += emission
         haul_map[d['haul']] += emission
         class_map[d['travel_class']] += emission
