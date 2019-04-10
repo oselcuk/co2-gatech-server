@@ -1,1 +1,16 @@
 runtime: python37
+
+handlers:
+  - url: /
+    secure: always
+    redirect_http_response_code: 301
+    static_files: front-end/co2-gatech/index.html
+    upload: front-end/co2-gatech/index.html
+  - url: /static
+    secure: always
+    redirect_http_response_code: 301
+    static_dir: front-end/co2-gatech/static
+  - url: /api/.*
+    secure: always
+    redirect_http_response_code: 301
+    script: auto

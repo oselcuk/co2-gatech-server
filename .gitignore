@@ -105,3 +105,6 @@ venv.bak/
 
 # Service keys
 *service-key.json
+
+# front-end stuff
+front-end/
