@@ -27,6 +27,7 @@ paths:
         - $ref: '#/components/parameters/sortBy'
         - $ref: '#/components/parameters/sortOrder'
         - $ref: '#/components/parameters/units'
+        # TODO: Extract begin and end to components
         - in: query
           name: begin
           description: |
@@ -106,20 +107,20 @@ paths:
         - $ref: '#/components/parameters/limit'
         - $ref: '#/components/parameters/fields'
         - $ref: '#/components/parameters/units'
-        - name: period
-          in: query
+        - in: query
+          name: begin
           description: |
-            time period to return information for, specified with `start=YYYYMMDD`(inclusive)
-            and optionally `end=YYYYMMDD`(exclusive). Alternatively, `year=YYYY` can be used to
-            mean the school year starting on the fall of that year, and `season=Fall|Spring|Summer`
-            can be provided to specify only that semester of the year. Defaults to all time
-          required: false
+            Emissions due to itineraries that began before this date will be ignored for the summary.
           schema:
-            oneOf:
-              - $ref: '#/components/schemas/timePeriod'
-              - $ref: '#/components/schemas/semester'
-          style: form
-          explode: true
+            type: string
+            format: date
+        - in: query
+          name: end
+          description: |
+            Emissions due to itineraries that began after this date will be ignored for the summary.
+          schema:
+            type: string
+            format: date
         - name: granularity
           in: query
           description: |
@@ -127,7 +128,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [week, month, semester, year, schoolYear]
+            enum: [week, month, year]
       responses:
         '200':
           description: One or more rows of emission data, covering the requested interval
@@ -145,6 +146,7 @@ paths:
                 $ref: '#/components/schemas/errorReturn'
         '404':
           description: Department not found
+# TODO: Turn this into an /emitters collection similar to departments
   /top_emitters:
     get:
       tags:
@@ -320,6 +322,22 @@ components:
           description: |
             Maps haul types to total emissions and percentage they're responsible for
             Current haul types are 'short', 'medium' and 'long'
+        emissionsByClass:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              emissions:
+                type: number
+                minimum: 0
+              percentage:
+                type: number
+                minimum: 0
+                maximum: 100
+          description: |
+            Maps travel classes to total emissions and percentage they're responsible for
+            Current class types are 'economy', 'economy+', 'business' and 'first'
+
         equivalents:
           type: object
           additionalProperties:

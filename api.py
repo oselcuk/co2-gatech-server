@@ -97,9 +97,65 @@ def add_department(idd, name):
 
 
 def get_department(
-    department, offset, limit, fields, units, period, granularity
+    department,
+    offset,
+    limit,
+    fields,
+    units,
+    begin=None,
+    end=None,
+    granularity=None
 ):
-    pass
+    # TODO: respect granularity
+    flights_ref = db.collection('flights').order_by('departure_date')
+    if begin or end:
+        begin = parse_date(begin) or datetime.min
+        end = parse_date(end) or datetime.max
+        flights_ref.where('departure_date', '>=',
+                          begin).where('departure_date', '<=', end)
+    if department != 'all':
+        dep_ref = db.document('departments', department)
+        flights_ref.where('department', '==', dep_ref)
+    # For now we're just returning all data in one chunk
+    # We are also ignoring cost to offset stuff because we don't have
+    #  calculations for that yet
+    haul_map = {haul: 0 for haul in ('short', 'medium', 'long')}
+    class_map = {
+        clas: 0
+        for clas in ('economy', 'economy+', 'business', 'first')
+    }
+    total = 0
+    for flight in flights_ref.get():
+        d = flight.to_dict()
+        emission = d['emission']
+        total += emission
+        haul_map[d['haul']] += emission
+        class_map[d['travel_class']] += emission
+
+    def add_percentages(d):
+        return {
+            k: {
+                'emissions': v,
+                'percentage': 100 * v / total
+            }
+            for k, v in d.items()
+        }
+
+    haul_map = add_percentages(haul_map)
+    class_map = add_percentages(class_map)
+
+    return [
+        {
+            'period':
+                {
+                    'begin': begin or datetime.min,
+                    'end': end or datetime.max
+                },
+            'totalEmissions': total,
+            'emissionsByHaul': haul_map,
+            'emissionsByClass': class_map
+        }
+    ]
 
 
 app = connexion.App(__name__, specification_dir='.', debug=True)
