@@ -48,7 +48,15 @@ def list_departments(offset, limit, fields, units, begin=None, end=None):
             dep[kTotalEmissions] *= KG_TO_LB
             # km to mi
             dep[kTotalDistance] *= KM_TO_MI
-    return {'result': deps, 'total': 1}
+    total_distance = sum(dep['total_distance'] for dep in deps)
+    total_emissions = sum(dep['total_emissions'] for dep in deps)
+
+    return {
+        'result': deps,
+        'total': 1,
+        'total_distance': total_distance,
+        'total_emissions': total_emissions
+    }
 
 
 def get_top_emitters(offset, limit, units, begin=None, end=None):
