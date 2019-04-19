@@ -20,7 +20,7 @@ def department_to_dict(dep):
 
 
 def list_departments(offset, limit, fields, units, begin=None, end=None):
-    # TODO: Respect the arguments when we have more than one department
+    # TODO: Respect the paging arguments
     kTotalEmissions = 'total_emissions'
     kTotalDistance = 'total_distance'
     kDepartment = 'department'
@@ -81,6 +81,7 @@ def get_top_emitters(offset, limit, units, begin=None, end=None):
     emitters = list(emitters.values())
     total = len(emitters)
     emitters.sort(reverse=True)
+    total = sum(d[0] for d in emitters)
     emitters = emitters[offset:(limit + offset)]
     if units == 'imperial':
         for emitter in emitters:
@@ -93,7 +94,8 @@ def get_top_emitters(offset, limit, units, begin=None, end=None):
             'rank': offset + 1 + i,
             'totalEmissions': d[0],
             'totalDistance': d[1],
-            'numberOfFlights': d[2]
+            'numberOfFlights': d[2],
+            'percentage': 100 * d[0] / total
         }
 
     emitters = map(idx_and_data_to_row, enumerate(emitters))
@@ -114,7 +116,7 @@ def get_department(
     end=None,
     granularity=None
 ):
-    # TODO: respect granularity
+    # TODO: respect values of granularity other than year
     flights_ref = db.collection('flights').order_by('departure_date')
     if begin or end:
         begin = parse_date(begin) or datetime.min
@@ -124,47 +126,68 @@ def get_department(
     if department != 'all':
         dep_ref = db.document('departments', department)
         flights_ref.where('department', '==', dep_ref)
-    # For now we're just returning all data in one chunk
-    # We are also ignoring cost to offset stuff because we don't have
+    # For now we're ignoring cost to offset stuff because we don't have
     #  calculations for that yet
-    haul_map = {haul: 0 for haul in ('short', 'medium', 'long')}
-    class_map = {
+    proto_haul_map = {haul: 0 for haul in ('short', 'medium', 'long')}
+    proto_class_map = {
         clas: 0
         for clas in ('economy', 'economy+', 'business', 'first')
     }
-    total = 0
-    factor = KG_TO_LB if units == 'imperial' else 1
-    for flight in flights_ref.get():
-        d = flight.to_dict()
-        emission = d['emission'] * factor
-        total += emission
-        haul_map[d['haul']] += emission
-        class_map[d['travel_class']] += emission
 
-    def add_percentages(d):
+    def add_percentages(d, t):
         return {
             k: {
                 'emissions': v,
-                'percentage': 100 * v / total
+                'percentage': 100 * v / t
             }
             for k, v in d.items()
         }
 
-    haul_map = add_percentages(haul_map)
-    class_map = add_percentages(class_map)
+    factor = KG_TO_LB if units == 'imperial' else 1
+    flights = list(map(lambda x: x.to_dict(), flights_ref.get()))
+    if not flights:
+        return []
+    flight_buckets = []
+    if granularity == 'year':
+        flight_buckets.append([])
+        current_year = flights[0]['departure_date'].year
+        for flight in flights:
+            year = flight['departure_date'].year
+            if year != current_year:
+                flight_buckets.append([])
+                current_year = year
+            flight_buckets[-1].append(flight)
+    else:
+        flight_buckets = [flights]
+    results = []
+    for flights in flight_buckets:
+        haul_map = proto_haul_map.copy()
+        class_map = proto_class_map.copy()
+        total = 0
+        for flight in flights:
+            emission = flight['emission'] * factor
+            total += emission
+            haul_map[flight['haul']] += emission
+            class_map[flight['travel_class']] += emission
 
-    return [
-        {
-            'period':
-                {
-                    'begin': begin or datetime.min,
-                    'end': end or datetime.max
+        first = flights[0]['departure_date']
+        last = flights[-1]['departure_date']
+
+        haul_map = add_percentages(haul_map, total)
+        class_map = add_percentages(class_map, total)
+        results.append(
+            {
+                'period': {
+                    'begin': first,
+                    'end': last
                 },
-            'totalEmissions': total,
-            'emissionsByHaul': haul_map,
-            'emissionsByClass': class_map
-        }
-    ]
+                'totalEmissions': total,
+                'emissionsByHaul': haul_map,
+                'emissionsByClass': class_map
+            }
+        )
+
+    return results
 
 
 app = connexion.App(__name__, specification_dir='.', debug=True)
