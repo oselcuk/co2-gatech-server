@@ -64,8 +64,8 @@ def get_top_emitters(offset, limit, units, begin=None, end=None):
     if begin or end:
         begin = parse_date(begin) or datetime.min
         end = parse_date(end) or datetime.max
-        flights_ref.where('departure_date', '>=',
-                          begin).where('departure_date', '<=', end)
+        flights_ref = flights_ref.where('departure_date', '>=', begin
+                                        ).where('departure_date', '<=', end)
     emitters = {}
     for flight in flights_ref.get():
         d = flight.to_dict()
@@ -121,11 +121,11 @@ def get_department(
     if begin or end:
         begin = parse_date(begin) or datetime.min
         end = parse_date(end) or datetime.max
-        flights_ref.where('departure_date', '>=',
-                          begin).where('departure_date', '<=', end)
+        flights_ref = flights_ref.where('departure_date', '>=', begin
+                                        ).where('departure_date', '<=', end)
     if department != 'all':
         dep_ref = db.document('departments', department)
-        flights_ref.where('department', '==', dep_ref)
+        flights_ref = flights_ref.where('department', '==', dep_ref)
     # For now we're ignoring cost to offset stuff because we don't have
     #  calculations for that yet
     proto_haul_map = {haul: 0 for haul in ('short', 'medium', 'long')}
