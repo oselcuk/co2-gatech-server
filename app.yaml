@@ -6,11 +6,18 @@ handlers:
     redirect_http_response_code: 301
     static_files: front-end/co2-gatech/index.html
     upload: front-end/co2-gatech/index.html
-  - url: /static
+  - url: /index.css
     secure: always
     redirect_http_response_code: 301
-    static_dir: front-end/co2-gatech/static
-  - url: /api/.*
+    static_files: front-end/co2-gatech/index.css
+    upload: front-end/co2-gatech/index.css
+  - url: /index.js
     secure: always
     redirect_http_response_code: 301
-    script: auto
+    static_files: front-end/co2-gatech/index.js
+    upload: front-end/co2-gatech/index.js
+  - url: /gt-logo.png
+    secure: always
+    redirect_http_response_code: 301
+    static_files: front-end/co2-gatech/gt-logo.png
+    upload: front-end/co2-gatech/gt-logo.png
