@@ -6,6 +6,11 @@ handlers:
     redirect_http_response_code: 301
     static_files: front-end/co2-gatech/index.html
     upload: front-end/co2-gatech/index.html
+  - url: /favicon.ico
+    secure: always
+    redirect_http_response_code: 301
+    static_files: front-end/co2-gatech/favicon.ico
+    upload: front-end/co2-gatech/favicon.ico
   - url: /index.css
     secure: always
     redirect_http_response_code: 301
